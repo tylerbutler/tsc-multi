@@ -7,6 +7,7 @@ import {
   isIncrementalCompilation,
 } from "../utils";
 import { createRewriteImportTransformer } from "../transformers/rewriteImport";
+import { createRewriteDtsImportTransformer } from "../transformers/rewriteDtsImport";
 import { WorkerOptions } from "./types";
 import { dirname, extname, join } from "path";
 
@@ -61,6 +62,9 @@ export class Worker {
 
   private getJSMapPath(path: string): string {
     if (!this.data.extname) return path;
+
+    // const ext = this.data.extname === ".mjs" ? "" : "";
+    // return trimSuffix(path, JS_MAP_EXT) + ext + MAP_EXT;
 
     return trimSuffix(path, JS_MAP_EXT) + this.data.extname + MAP_EXT;
   }
@@ -191,15 +195,40 @@ export class Worker {
   ) {
     const { createProgram, reportDiagnostic } = host;
 
-    const transformers: ts.CustomTransformers = {
-      after: [
-        createRewriteImportTransformer({
-          extname: this.data.extname || JS_EXT,
-          system: this.system,
-          ts: this.ts,
-        }),
-      ],
-    };
+    debug(`rewriteDtsImports === ${this.data.target.rewriteDtsImports}`);
+    const transformers: ts.CustomTransformers =
+      this.data.target.rewriteDtsImports === true
+        ? {
+            after: [
+              createRewriteImportTransformer({
+                extname: this.data.extname || JS_EXT,
+                rewriteDtsImports: this.data.target
+                  .rewriteDtsImports as boolean,
+                system: this.system,
+                ts: this.ts,
+              }),
+            ],
+            afterDeclarations: [
+              createRewriteDtsImportTransformer({
+                extname: this.data.extname || JS_EXT,
+                rewriteDtsImports: this.data.target
+                  .rewriteDtsImports as boolean,
+                system: this.system,
+                ts: this.ts,
+              }),
+            ],
+          }
+        : {
+            after: [
+              createRewriteImportTransformer({
+                extname: this.data.extname || JS_EXT,
+                rewriteDtsImports: this.data.target
+                  .rewriteDtsImports as boolean,
+                system: this.system,
+                ts: this.ts,
+              }),
+            ],
+          };
 
     const parseConfigFileHost: ts.ParseConfigFileHost = {
       ...this.system,
@@ -293,6 +322,7 @@ export class Worker {
       after: [
         createRewriteImportTransformer({
           extname: this.data.extname || JS_EXT,
+          rewriteDtsImports: this.data.target.rewriteDtsImports as boolean,
           system: this.system,
           ts: this.ts,
         }),

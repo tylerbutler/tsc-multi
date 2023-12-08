@@ -1,6 +1,7 @@
 import { resolve, dirname, extname } from "path";
-import type ts from "typescript";
+import ts from "typescript";
 import { trimSuffix } from "../utils";
+import { RewriteImportTransformerOptions } from "./rewriteImport";
 
 const JS_EXT = ".js";
 const JSON_EXT = ".json";
@@ -8,17 +9,9 @@ const JSON_EXT = ".json";
 function isRelativePath(path: string): boolean {
   return path.startsWith("./") || path.startsWith("../");
 }
-
-export interface RewriteImportTransformerOptions {
-  extname: string;
-  rewriteDtsImports: boolean;
-  system: ts.System;
-  ts: typeof ts;
-}
-
-export function createRewriteImportTransformer(
+export function createRewriteDtsImportTransformer(
   options: RewriteImportTransformerOptions
-): ts.TransformerFactory<ts.SourceFile> {
+): ts.TransformerFactory<ts.SourceFile | ts.Bundle> {
   const {
     sys,
     factory,
@@ -46,13 +39,16 @@ export function createRewriteImportTransformer(
   ): ts.Expression {
     if (!isStringLiteral(node) || !isRelativePath(node.text)) return node;
 
+    const ext = extname(node.text);
+    if (ext === ".cjs") {
+      return factory.createStringLiteral(node.text);
+    }
+
     if (isDirectory(sourceFile, node.text)) {
       return factory.createStringLiteral(
         `${node.text}/index${options.extname}`
       );
     }
-
-    const ext = extname(node.text);
 
     if (ext === JSON_EXT && ctx.getCompilerOptions().resolveJsonModule) {
       return node;
@@ -125,6 +121,9 @@ export function createRewriteImportTransformer(
     };
 
     return (file) => {
+      if (file.kind === ts.SyntaxKind.Bundle) {
+        throw new Error(`Doesn't work on bundles.`);
+      }
       sourceFile = file;
       return visitNode(file, visitor) as ts.SourceFile;
     };

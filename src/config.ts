@@ -19,6 +19,7 @@ const debug = Debug.extend("config");
 
 const targetSchema = type({
   extname: optional(string()),
+  rewriteDtsImports: optional(boolean()),
   transpileOnly: optional(boolean()),
 });
 
