@@ -15,7 +15,6 @@ const JS_EXT = ".js";
 const MAP_EXT = ".map";
 const JS_MAP_EXT = `${JS_EXT}${MAP_EXT}`;
 const DTS_EXT = ".d.ts";
-const DTS_EXT_ESM = ".d.mts";
 const DTS_MAP_EXT = `${DTS_EXT}${MAP_EXT}`;
 
 type TS = typeof ts;
@@ -64,14 +63,13 @@ export class Worker {
   }
 
   private getDtsPath(path: string): string {
-    // Exclude files in node_modules
-    if (!this.data.extname || path.includes("node_modules")) return path;
+    if (!this.data.dtsExtName) return path;
 
     return trimSuffix(path, DTS_EXT) + this.getDtsExtension();
   }
 
   private getDtsExtension(): string {
-    return this.data.extname === ".mjs" ? DTS_EXT_ESM : DTS_EXT;
+    return this.data.dtsExtName ?? DTS_EXT;
   }
 
   private getJSMapPath(path: string): string {
@@ -81,15 +79,14 @@ export class Worker {
   }
 
   private getDtsMapPath(path: string): string {
-    // Exclude files in node_modules
-    if (!this.data.extname || path.includes("node_modules")) return path;
+    if (!this.data.dtsExtName) return path;
 
     return trimSuffix(path, DTS_MAP_EXT) + this.getDtsExtension() + MAP_EXT;
   }
 
   /**
-   * Rewrites an output file path based on its extension. If ignoreDts is true, then paths to DSTS files will not be
-   * rewritten. This is used so that DTS paths are only rewritten under specific circumstances.
+   * Rewrites an output file path based on its extension. If ignoreDts is true, then paths to .d.ts files will not be
+   * rewritten. This is used so that .d.ts file paths are only rewritten under specific circumstances.
    */
   private rewritePath(path: string, ignoreDts: boolean): string {
     if (path.endsWith(JS_EXT)) {
@@ -236,15 +233,14 @@ export class Worker {
   ) {
     const { createProgram, reportDiagnostic } = host;
 
-    debug(`rewriteDtsImports === ${this.data.target.rewriteDtsImports}`);
+    debug(`dtsExtName === ${this.data.dtsExtName}`);
     const transformers: ts.CustomTransformers =
-      this.data.target.rewriteDtsImports === true
+      this.data.dtsExtName !== undefined
         ? {
             after: [
               createRewriteImportTransformer({
                 extname: this.data.extname || JS_EXT,
-                rewriteDtsImports: this.data.target
-                  .rewriteDtsImports as boolean,
+                dtsExtName: this.data.dtsExtName ?? DTS_EXT,
                 system: this.system,
                 ts: this.ts,
               }),
@@ -252,8 +248,7 @@ export class Worker {
             afterDeclarations: [
               createRewriteDtsImportTransformer({
                 extname: this.data.extname || JS_EXT,
-                rewriteDtsImports: this.data.target
-                  .rewriteDtsImports as boolean,
+                dtsExtName: this.data.dtsExtName ?? DTS_EXT,
                 system: this.system,
                 ts: this.ts,
               }),
@@ -263,8 +258,7 @@ export class Worker {
             after: [
               createRewriteImportTransformer({
                 extname: this.data.extname || JS_EXT,
-                rewriteDtsImports: this.data.target
-                  .rewriteDtsImports as boolean,
+                dtsExtName: this.data.dtsExtName ?? DTS_EXT,
                 system: this.system,
                 ts: this.ts,
               }),
@@ -363,7 +357,7 @@ export class Worker {
       after: [
         createRewriteImportTransformer({
           extname: this.data.extname || JS_EXT,
-          rewriteDtsImports: this.data.target.rewriteDtsImports as boolean,
+          dtsExtName: this.data.dtsExtName ?? DTS_EXT,
           system: this.system,
           ts: this.ts,
         }),

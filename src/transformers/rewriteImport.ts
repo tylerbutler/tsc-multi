@@ -11,7 +11,7 @@ function isRelativePath(path: string): boolean {
 
 export interface RewriteImportTransformerOptions {
   extname: string;
-  rewriteDtsImports: boolean;
+  dtsExtName: string;
   system: ts.System;
   ts: typeof ts;
 }

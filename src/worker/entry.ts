@@ -12,6 +12,7 @@ async function loadWorkerData(): Promise<WorkerOptions> {
   debug("Worker started");
 
   const data = await loadWorkerData();
+  data.dtsExtName = data.target.dtsExtName as string;
   debug("Target", data.target);
 
   const worker = new Worker(data);
