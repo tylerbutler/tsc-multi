@@ -126,7 +126,31 @@ export class Worker {
 
   private createSystem(sys: Readonly<ts.System>): ts.System {
     const getReadPaths = (path: string) => {
-      // When reading paths, we don't want to rewrite the paths to DTS files, so we pass true to ignoreDts
+      /**
+       * When reading paths, we don't want to rewrite the paths to DTS files, so we pass `true` to ignoreDts. If we
+       * rewrite dts paths here, we get compilation failures like this:
+       *
+       * [mjs]: error TS6053: File 'FluidFramework/node_modules/.pnpm/typescript@5.1.6/node_modules/typescript/lib/lib.dom.d.ts' not found.
+       *   The file is in the program because:
+       *     Library 'lib.dom.d.ts' specified in compilerOptions
+       * [mjs]: error TS6053: File 'FluidFramework/node_modules/.pnpm/typescript@5.1.6/node_modules/typescript/lib/lib.dom.iterable.d.ts' not found.
+       *   The file is in the program because:
+       *     Library 'lib.dom.iterable.d.ts' specified in compilerOptions
+       * [mjs]: error TS6053: File 'FluidFramework/node_modules/.pnpm/typescript@5.1.6/node_modules/typescript/lib/lib.es2020.d.ts' not found.
+       *   The file is in the program because:
+       *     Library 'lib.es2020.d.ts' specified in compilerOptions
+       * [mjs]: error TS2318: Cannot find global type 'Array'.
+       * [mjs]: error TS2318: Cannot find global type 'Boolean'.
+       * [mjs]: error TS2318: Cannot find global type 'CallableFunction'.
+       * [mjs]: error TS2318: Cannot find global type 'Function'.
+       * [mjs]: error TS2318: Cannot find global type 'IArguments'.
+       * [mjs]: error TS2318: Cannot find global type 'NewableFunction'.
+       * [mjs]: error TS2318: Cannot find global type 'Number'.
+       * [mjs]: error TS2318: Cannot find global type 'Object'.
+       * [mjs]: error TS2318: Cannot find global type 'RegExp'.
+       * [mjs]: error TS2318: Cannot find global type 'String'.
+       * [mjs]: Found 13 errors.
+       */
       const paths = [this.rewritePath(path, true)];
 
       // Source files may be .js files when `allowJs` is enabled. When a .js
@@ -251,7 +275,7 @@ export class Worker {
             after: [
               createRewriteImportTransformer({
                 extname: this.data.extname || JS_EXT,
-                dtsExtName: this.data.dtsExtName ?? DTS_EXT,
+                dtsExtName: this.data.dtsExtName || DTS_EXT,
                 system: this.system,
                 ts: this.ts,
               }),
@@ -350,7 +374,7 @@ export class Worker {
       after: [
         createRewriteImportTransformer({
           extname: this.data.extname || JS_EXT,
-          dtsExtName: this.data.dtsExtName ?? DTS_EXT,
+          dtsExtName: this.data.dtsExtName || DTS_EXT,
           system: this.system,
           ts: this.ts,
         }),
