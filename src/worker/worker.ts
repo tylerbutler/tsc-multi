@@ -65,11 +65,7 @@ export class Worker {
   private getDtsPath(path: string): string {
     if (!this.data.dtsExtName) return path;
 
-    return trimSuffix(path, DTS_EXT) + this.getDtsExtension();
-  }
-
-  private getDtsExtension(): string {
-    return this.data.dtsExtName ?? DTS_EXT;
+    return trimSuffix(path, DTS_EXT) + this.data.dtsExtName;
   }
 
   private getJSMapPath(path: string): string {
@@ -81,14 +77,14 @@ export class Worker {
   private getDtsMapPath(path: string): string {
     if (!this.data.dtsExtName) return path;
 
-    return trimSuffix(path, DTS_MAP_EXT) + this.getDtsExtension() + MAP_EXT;
+    return trimSuffix(path, DTS_MAP_EXT) + this.data.dtsExtName + MAP_EXT;
   }
 
   /**
    * Rewrites an output file path based on its extension. If ignoreDts is true, then paths to .d.ts files will not be
    * rewritten. This is used so that .d.ts file paths are only rewritten under specific circumstances.
    */
-  private rewritePath(path: string, ignoreDts: boolean): string {
+  private rewritePath(path: string, ignoreDts = false): string {
     if (path.endsWith(JS_EXT)) {
       return this.getJSPath(path);
     }
@@ -112,22 +108,19 @@ export class Worker {
 
   private rewriteSourceMappingURL(data: string): string {
     return data.replace(/\/\/# sourceMappingURL=(.+)/g, (_, path) => {
-      const newPath = path.endsWith(DTS_MAP_EXT)
-        ? this.getDtsMapPath(path)
-        : this.getJSMapPath(path);
-      debug(`replacing sourceMapUrl path: ${path} ==> ${newPath}`);
-
-      return `//# sourceMappingURL=${newPath}`;
+      debug(
+        `replacing sourceMapUrl path: ${path} ==> ${this.rewritePath(path)}`
+      );
+      return `//# sourceMappingURL=${this.rewritePath(path)}`;
     });
   }
 
   private rewriteSourceMap(data: string): string {
     const json = JSON.parse(data);
-    const newPath = (json.file as string).endsWith(DTS_EXT)
-      ? this.getDtsPath(json.file)
-      : this.getJSPath(json.file);
-    debug(`rewriting sourcemap: ${json.file} ==> ${newPath}`);
-    json.file = newPath;
+    debug(
+      `rewriting sourcemap: ${json.file} ==> ${this.rewritePath(json.file)}`
+    );
+    json.file = this.rewritePath(json.file);
     return JSON.stringify(json);
   }
 
@@ -163,7 +156,7 @@ export class Worker {
         );
       },
       writeFile: (path, data, writeByteOrderMark) => {
-        const newPath = this.rewritePath(path, false);
+        const newPath = this.rewritePath(path);
         const newData = (() => {
           if (path.endsWith(JS_EXT) || path.endsWith(DTS_EXT)) {
             return this.rewriteSourceMappingURL(data);
@@ -180,7 +173,7 @@ export class Worker {
         sys.writeFile(newPath, newData, writeByteOrderMark);
       },
       deleteFile: (path) => {
-        const newPath = this.rewritePath(path, false);
+        const newPath = this.rewritePath(path);
         debug("Delete file: %s", newPath);
         sys.deleteFile?.(newPath);
       },
@@ -240,7 +233,7 @@ export class Worker {
             after: [
               createRewriteImportTransformer({
                 extname: this.data.extname || JS_EXT,
-                dtsExtName: this.data.dtsExtName ?? DTS_EXT,
+                dtsExtName: this.data.dtsExtName || DTS_EXT,
                 system: this.system,
                 ts: this.ts,
               }),
@@ -248,7 +241,7 @@ export class Worker {
             afterDeclarations: [
               createRewriteDtsImportTransformer({
                 extname: this.data.extname || JS_EXT,
-                dtsExtName: this.data.dtsExtName ?? DTS_EXT,
+                dtsExtName: this.data.dtsExtName || DTS_EXT,
                 system: this.system,
                 ts: this.ts,
               }),
