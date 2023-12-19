@@ -14,6 +14,9 @@ import { dirname, extname, join } from "path";
 const JS_EXT = ".js";
 const MAP_EXT = ".map";
 const JS_MAP_EXT = `${JS_EXT}${MAP_EXT}`;
+const DTS_EXT = ".d.ts";
+const DTS_EXT_ESM = ".d.mts";
+const DTS_MAP_EXT = `${DTS_EXT}${MAP_EXT}`;
 
 type TS = typeof ts;
 
@@ -60,16 +63,35 @@ export class Worker {
     return trimSuffix(path, JS_EXT) + this.data.extname;
   }
 
+  private getDtsPath(path: string): string {
+    // Exclude files in node_modules
+    if (!this.data.extname || path.includes("node_modules")) return path;
+
+    return trimSuffix(path, DTS_EXT) + this.getDtsExtension();
+  }
+
+  private getDtsExtension(): string {
+    return this.data.extname === ".mjs" ? DTS_EXT_ESM : DTS_EXT;
+  }
+
   private getJSMapPath(path: string): string {
     if (!this.data.extname) return path;
-
-    // const ext = this.data.extname === ".mjs" ? "" : "";
-    // return trimSuffix(path, JS_MAP_EXT) + ext + MAP_EXT;
 
     return trimSuffix(path, JS_MAP_EXT) + this.data.extname + MAP_EXT;
   }
 
-  private rewritePath(path: string): string {
+  private getDtsMapPath(path: string): string {
+    // Exclude files in node_modules
+    if (!this.data.extname || path.includes("node_modules")) return path;
+
+    return trimSuffix(path, DTS_MAP_EXT) + this.getDtsExtension() + MAP_EXT;
+  }
+
+  /**
+   * Rewrites an output file path based on its extension. If ignoreDts is true, then paths to DSTS files will not be
+   * rewritten. This is used so that DTS paths are only rewritten under specific circumstances.
+   */
+  private rewritePath(path: string, ignoreDts: boolean): string {
     if (path.endsWith(JS_EXT)) {
       return this.getJSPath(path);
     }
@@ -78,25 +100,44 @@ export class Worker {
       return this.getJSMapPath(path);
     }
 
+    if (ignoreDts === false) {
+      if (path.endsWith(DTS_EXT)) {
+        return this.getDtsPath(path);
+      }
+
+      if (path.endsWith(DTS_MAP_EXT)) {
+        return this.getDtsMapPath(path);
+      }
+    }
+
     return path;
   }
 
   private rewriteSourceMappingURL(data: string): string {
-    return data.replace(
-      /\/\/# sourceMappingURL=(.+)/g,
-      (_, path) => `//# sourceMappingURL=${this.getJSMapPath(path)}`
-    );
+    return data.replace(/\/\/# sourceMappingURL=(.+)/g, (_, path) => {
+      const newPath = path.endsWith(DTS_MAP_EXT)
+        ? this.getDtsMapPath(path)
+        : this.getJSMapPath(path);
+      debug(`replacing sourceMapUrl path: ${path} ==> ${newPath}`);
+
+      return `//# sourceMappingURL=${newPath}`;
+    });
   }
 
   private rewriteSourceMap(data: string): string {
     const json = JSON.parse(data);
-    json.file = this.getJSPath(json.file);
+    const newPath = (json.file as string).endsWith(DTS_EXT)
+      ? this.getDtsPath(json.file)
+      : this.getJSPath(json.file);
+    debug(`rewriting sourcemap: ${json.file} ==> ${newPath}`);
+    json.file = newPath;
     return JSON.stringify(json);
   }
 
   private createSystem(sys: Readonly<ts.System>): ts.System {
     const getReadPaths = (path: string) => {
-      const paths = [this.rewritePath(path)];
+      // When reading paths, we don't want to rewrite the paths to DTS files, so we pass true to ignoreDts
+      const paths = [this.rewritePath(path, true)];
 
       // Source files may be .js files when `allowJs` is enabled. When a .js
       // file with rewritten path doesn't exist, retry again without rewriting
@@ -125,13 +166,13 @@ export class Worker {
         );
       },
       writeFile: (path, data, writeByteOrderMark) => {
-        const newPath = this.rewritePath(path);
+        const newPath = this.rewritePath(path, false);
         const newData = (() => {
-          if (path.endsWith(JS_EXT)) {
+          if (path.endsWith(JS_EXT) || path.endsWith(DTS_EXT)) {
             return this.rewriteSourceMappingURL(data);
           }
 
-          if (path.endsWith(JS_MAP_EXT)) {
+          if (path.endsWith(JS_MAP_EXT) || path.endsWith(DTS_MAP_EXT)) {
             return this.rewriteSourceMap(data);
           }
 
@@ -142,7 +183,7 @@ export class Worker {
         sys.writeFile(newPath, newData, writeByteOrderMark);
       },
       deleteFile: (path) => {
-        const newPath = this.rewritePath(path);
+        const newPath = this.rewritePath(path, false);
         debug("Delete file: %s", newPath);
         sys.deleteFile?.(newPath);
       },
