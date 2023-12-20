@@ -142,18 +142,18 @@ export function createRewriteDtsImportTransformer(
           // not caught by other conditions in this file. We need to transform the string literal to a valid path
           // with a file name and extension so the ESM build doesn't complain.
 
-          if (sourceFile.fileName.includes("testRecursiveDomain")) {
-            console.log(
-              `sourceFile: ${sourceFile.fileName}, ${
-                node.text
-              }, isRelativePath: ${isRelativePath(
-                node.text
-              )}, isDirectory: ${isDirectory(
-                sourceFile,
-                node.text
-              )}, extname: ${extname(node.text)}`
-            );
-          }
+          // if (sourceFile.fileName.includes("testRecursiveDomain")) {
+          //   console.log(
+          //     `sourceFile: ${sourceFile.fileName}, ${
+          //       node.text
+          //     }, isRelativePath: ${isRelativePath(
+          //       node.text
+          //     )}, isDirectory: ${isDirectory(
+          //       sourceFile,
+          //       node.text
+          //     )}, extname: ${extname(node.text)}`
+          //   );
+          // }
 
           // Ignore if it's not a relative path. ".." is a relative path for our purposes but is not considered as such by
           // isRelativePath(), so we need to let that exception fall through to the code below.
