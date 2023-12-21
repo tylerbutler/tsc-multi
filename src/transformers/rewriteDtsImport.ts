@@ -134,7 +134,9 @@ export function createRewriteDtsImportTransformer(
           // The ideal solution uses isTemplateLiteralTypeSpan() and isMappedTypeNode() imported from the Typescript
           // package but it runs into the same problem (I assume the function definitions that end up in the built
           // tsc-multi have the old values hardcoded).
-          // Maybe a "deeper patch" of tsc-multi would help here, but things start getting really weird and brittle.
+          // Maybe a "deeper patch" of tsc-multi would help here, or building the patch with the exact TS version
+          // that we'll use to build FF (overriding the 5.0.3 tsc-multi has in its lockfile) but things start getting
+          // really weird and brittle.
           recentNodes[1].kind == 200 && // SyntaxKind.MappedType
           recentNodes[2].kind == 204 // SyntaxKind.TemplateLiteralTypeSpan
         ) {
