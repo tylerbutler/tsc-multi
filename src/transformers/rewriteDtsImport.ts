@@ -18,6 +18,8 @@ export function createRewriteDtsImportTransformer(
     isStringLiteral,
     isImportDeclaration,
     isCallExpression,
+    // isMappedTypeNode,
+    // isTemplateLiteralTypeSpan,
     SyntaxKind,
     visitNode,
     visitEachChild,
@@ -70,15 +72,6 @@ export function createRewriteDtsImportTransformer(
         recentNodes.pop();
       }
 
-      // if (sourceFile.fileName.includes("testRecursiveDomain")) {
-      //   console.log(
-      //     `VISITOR [nodeKind: ${node.kind}, parent: ${node.parent?.kind
-      //     }, text: ${(node as any)?.text}, pos: ${node.pos}]`
-      //   );
-      //   console.log(
-      //     `RECENT_NODES: ${recentNodes[0]?.kind} ${recentNodes[1]?.kind} ${recentNodes[2]?.kind}`
-      //   );
-      // }
       // ESM import
       if (isImportDeclaration(node)) {
         return factory.createImportDeclaration(
@@ -115,47 +108,25 @@ export function createRewriteDtsImportTransformer(
       //      ...
       //
       // Tree has several cases, but the fully-defined explicit types are a nightmare to maintain.
-      if (recentNodes.length == 3) {
-        // if (sourceFile.fileName.includes("testRecursiveDomain")) {
-        //   console.log(
-        //     `CHECKING: ${isStringLiteral(node)} ${isMappedTypeNode(
-        //       recentNodes[1]
-        //     )} ${isTemplateLiteralTypeSpan(recentNodes[2])}`
-        //   );
-        // }
-        // NOTE: using isMappedTypeNode and isTemplateLiteralTypeSpan from options.ts was not working, returning false
-        // when the versions straight from 'ts' return true.
+      if (isStringLiteral(node)) {
         if (
-          isStringLiteral(node) &&
-          // If we hardcode these values (200, 204), which are the ones in TS 5.1.6, things work. In TS 5.0.3, the
-          // values are 197 and 201. Compiling tsc-multi with TS 5.0.3 seems to produce build output that ends up with
-          // the older values embedded somehow (probably enums being replaced with their underlying primitive value),
-          // which makes thing not work when running with TS 5.1.6, where the node kinds will have the new values.
+          // I got the 200 and 204 values from runtime when doing a build of FluidFramework.
+          // They could change if we update the TS version we use, so this could break in that case.
+          // I couldn't make this work by pinning the TS version used to build the tsc-multi patch to the same one we
+          // use in the FF repo, not sure why.
+          // Seems like when we run the build, *something* is using a newer version of TS?
+          // In TS 5.0.3, the values are 197 and 201. In 5.1.6 they are 199 and 203.
           // The ideal solution uses isTemplateLiteralTypeSpan() and isMappedTypeNode() imported from the Typescript
-          // package but it runs into the same problem (I assume the function definitions that end up in the built
-          // tsc-multi have the old values hardcoded).
-          // Maybe a "deeper patch" of tsc-multi would help here, or building the patch with the exact TS version
-          // that we'll use to build FF (overriding the 5.0.3 tsc-multi has in its lockfile) but things start getting
-          // really weird and brittle.
-          recentNodes[1].kind == 200 && // SyntaxKind.MappedType
-          recentNodes[2].kind == 204 // SyntaxKind.TemplateLiteralTypeSpan
+          // package but it runs into the same problem, the values we're getting at runtime don't match those of
+          // the one used when building tsc-multi (even pinning its TS dependency to 5.1.6).
+          // isStringLiteral (SyntaxKind.StringLiteral === 11) is lucky to not change between TS versions in my tests,
+          // and we want it for type narrowing anyway.
+          recentNodes[1]?.kind === 200 && // isMappedTypeNode(recentNodes[1]) && // SyntaxKind.MappedType
+          recentNodes[2]?.kind === 204 // isTemplateLiteralTypeSpan(recentNodes[2]) // SyntaxKind.TemplateLiteralTypeSpan
         ) {
           // The current node is the argument to a dynamic import (i.e. `import("../..")`) of a particular kind that is
           // not caught by other conditions in this file. We need to transform the string literal to a valid path
           // with a file name and extension so the ESM build doesn't complain.
-
-          // if (sourceFile.fileName.includes("testRecursiveDomain")) {
-          //   console.log(
-          //     `sourceFile: ${sourceFile.fileName}, ${
-          //       node.text
-          //     }, isRelativePath: ${isRelativePath(
-          //       node.text
-          //     )}, isDirectory: ${isDirectory(
-          //       sourceFile,
-          //       node.text
-          //     )}, extname: ${extname(node.text)}`
-          //   );
-          // }
 
           // Ignore if it's not a relative path. ".." is a relative path for our purposes but is not considered as such by
           // isRelativePath(), so we need to let that exception fall through to the code below.
